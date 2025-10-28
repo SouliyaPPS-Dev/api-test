@@ -1,0 +1,25 @@
+# Air configuration to hot-reload the API server.
+# https://github.com/air-verse/air
+
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "go build -o ./tmp/bin ./cmd/server"
+  bin = "./tmp/bin"
+  delay = 1000
+  stop_on_error = true
+  send_interrupt = true
+  kill_delay = 500
+
+[log]
+  time = true
+
+[watch]
+  include_dir = ["cmd", "internal"]
+  include_ext = ["go", "mod", "sum", "toml", "yaml", "yml", "json", "env", "sql"]
+  exclude_dir = ["tmp", ".git", ".gocache", ".gomodcache", "vendor", "postman"]
+  exclude_file = ["server.log"]
+
+[misc]
+  clean_on_exit = true
