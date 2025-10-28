@@ -1,9 +1,27 @@
 # Build artifacts
 tmp/
+bin/
+dist/
 
 # Go build caches
 .gocache/
 .gomodcache/
+
+# Go test/build artifacts
+*.test
+*.out
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.bin
+*.a
+*.prof
+*.trace
+coverage.*
+*.coverprofile
+coverage/
 
 # Local configuration overrides
 .env
@@ -13,5 +31,15 @@ tmp/
 server.log
 *.log
 
+# Editor/IDE settings
+.idea/
+.vscode/
+*.swp
+*~
+
 # OS junk
 .DS_Store
+Thumbs.db
+
+# Dependencies
+vendor/
