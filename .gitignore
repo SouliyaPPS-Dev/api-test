@@ -1,0 +1,17 @@
+# Build artifacts
+tmp/
+
+# Go build caches
+.gocache/
+.gomodcache/
+
+# Local configuration overrides
+.env
+*.local.env
+
+# Logs
+server.log
+*.log
+
+# OS junk
+.DS_Store
