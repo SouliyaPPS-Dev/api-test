@@ -37,10 +37,14 @@ jobs:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
           RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
           RAILWAY_ENVIRONMENT_ID: ${{ secrets.RAILWAY_ENVIRONMENT_ID }}
+          DATABASE_URL_SECRET: ${{ secrets.RAILWAY_DATABASE_URL }}
         run: |
           set -euo pipefail
-          DATABASE_URL_VALUE='postgresql://postgres:LTVVnXGRCRvwIUcEexXxDDNijgxEKLgO@shuttle.proxy.rlwy.net:55610/railway'
-          args=(variables set "DATABASE_URL=${DATABASE_URL_VALUE}")
+          if [ -z "${DATABASE_URL_SECRET:-}" ]; then
+            echo "DATABASE_URL secret not provided; skipping sync."
+            exit 0
+          fi
+          args=(variables set "DATABASE_URL=${DATABASE_URL_SECRET}")
           if [ -n "${RAILWAY_SERVICE_ID:-}" ]; then
             args+=(--service "${RAILWAY_SERVICE_ID}")
           fi
@@ -56,7 +60,10 @@ jobs:
           RAILWAY_ENVIRONMENT_ID: ${{ secrets.RAILWAY_ENVIRONMENT_ID }}
         run: |
           set -euo pipefail
-          args=(up --service "${RAILWAY_SERVICE_ID}")
+          args=(up)
+          if [ -n "${RAILWAY_SERVICE_ID:-}" ]; then
+            args+=(--service "${RAILWAY_SERVICE_ID}")
+          fi
           if [ -n "${RAILWAY_ENVIRONMENT_ID:-}" ]; then
             args+=(--environment "${RAILWAY_ENVIRONMENT_ID}")
           fi
