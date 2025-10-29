@@ -32,6 +32,23 @@ jobs:
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 
+      - name: Sync DATABASE_URL to Railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
+          RAILWAY_ENVIRONMENT_ID: ${{ secrets.RAILWAY_ENVIRONMENT_ID }}
+        run: |
+          set -euo pipefail
+          DATABASE_URL_VALUE='postgresql://postgres:LTVVnXGRCRvwIUcEexXxDDNijgxEKLgO@shuttle.proxy.rlwy.net:55610/railway'
+          args=(variables set "DATABASE_URL=${DATABASE_URL_VALUE}")
+          if [ -n "${RAILWAY_SERVICE_ID:-}" ]; then
+            args+=(--service "${RAILWAY_SERVICE_ID}")
+          fi
+          if [ -n "${RAILWAY_ENVIRONMENT_ID:-}" ]; then
+            args+=(--environment "${RAILWAY_ENVIRONMENT_ID}")
+          fi
+          railway "${args[@]}"
+
       - name: Deploy to Railway
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
