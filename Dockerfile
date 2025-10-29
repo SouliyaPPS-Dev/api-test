@@ -6,14 +6,11 @@ WORKDIR /app
 RUN go toolchain download go1.24.3
 
 COPY go.mod go.sum ./
-RUN --mount=type=cache,id=gomodcache,target=/go/pkg/mod \
-    --mount=type=cache,id=gobuildcache,target=/root/.cache/go-build \
-    GOTOOLCHAIN=go1.24.3 go mod download
+RUN GOTOOLCHAIN=go1.24.3 go mod download
 
 COPY . .
 
-RUN --mount=type=cache,id=gobuildcache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 GOOS=linux GOTOOLCHAIN=go1.24.3 \
+RUN CGO_ENABLED=0 GOOS=linux GOTOOLCHAIN=go1.24.3 \
     go build -trimpath -buildvcs=false -o /bin/server ./cmd/server
 
 FROM gcr.io/distroless/static-debian12:nonroot
