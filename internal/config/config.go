@@ -91,31 +91,56 @@ func splitCSV(value string) []string {
 }
 
 func resolveDatabaseURL() string {
-	if url := os.Getenv("DATABASE_URL"); url != "" {
-		return normalisePostgresScheme(url)
+	for _, key := range []string{"DATABASE_URL", "DATABASE_PUBLIC_URL", "POSTGRES_URL"} {
+		if url := os.Getenv(key); url != "" {
+			return normalisePostgresScheme(url)
+		}
 	}
 
-	host := os.Getenv("PGHOST")
-	user := os.Getenv("PGUSER")
-	database := os.Getenv("PGDATABASE")
-	if host == "" || user == "" || database == "" {
+	host := firstNonEmpty(
+		os.Getenv("PGHOST"),
+		os.Getenv("POSTGRES_HOST"),
+		os.Getenv("RAILWAY_TCP_PROXY_DOMAIN"),
+		os.Getenv("RAILWAY_PRIVATE_DOMAIN"),
+	)
+	user := firstNonEmpty(os.Getenv("PGUSER"), os.Getenv("POSTGRES_USER"))
+	if user == "" {
+		if dbUser := os.Getenv("DATABASE_USER"); dbUser != "" {
+			user = dbUser
+		}
+	}
+	password := firstNonEmpty(os.Getenv("PGPASSWORD"), os.Getenv("POSTGRES_PASSWORD"))
+	if password == "" {
+		password = os.Getenv("DATABASE_PASSWORD")
+	}
+	database := firstNonEmpty(os.Getenv("PGDATABASE"), os.Getenv("POSTGRES_DB"), os.Getenv("DATABASE_NAME"))
+	port := firstNonEmpty(os.Getenv("PGPORT"), os.Getenv("RAILWAY_TCP_PROXY_PORT"))
+	if port == "" {
+		port = "5432"
+	}
+	sslMode := firstNonEmpty(os.Getenv("PGSSLMODE"), os.Getenv("PGSSL_MODE"), "require")
+
+	if database == "" {
 		return ""
 	}
 
-	port := getEnv("PGPORT", "5432")
-	password := os.Getenv("PGPASSWORD")
-	sslMode := getEnv("PGSSLMODE", "require")
-
 	dsn := &neturl.URL{
 		Scheme: "postgres",
-		Host:   net.JoinHostPort(host, port),
 		Path:   "/" + database,
 	}
 
+	// Allow host to be empty only if we previously returned.
+	if host == "" {
+		return ""
+	}
+	dsn.Host = net.JoinHostPort(host, port)
+
+	if user == "" {
+		return ""
+	}
+	dsn.User = neturl.User(user)
 	if password != "" {
 		dsn.User = neturl.UserPassword(user, password)
-	} else {
-		dsn.User = neturl.User(user)
 	}
 
 	query := dsn.Query()
@@ -132,6 +157,15 @@ func normalisePostgresScheme(url string) string {
 		return "postgres://" + strings.TrimPrefix(url, "postgresql://")
 	}
 	return url
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 func loadDotEnv(path string) error {
