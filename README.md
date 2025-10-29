@@ -184,7 +184,7 @@ Configure these GitHub secrets before enabling the workflow:
 
 ### Railway Postgres Setup
 
-1. In Railway, add a **Postgres** plugin to the project that hosts this API.
-2. Copy the generated `DATABASE_URL` (Railway injects it automatically into the API service when linked).
-3. Make sure the API service has `JWT_SECRET`, `JWT_ISSUER`, and any other runtime configuration set in Railway variables.
-4. The GitHub workflow deploys via `railway up`, which builds the Docker image defined in `Dockerfile`. No extra database provisioning steps are required—the Railway Postgres service is attached by linking the service to the plugin.
+1. In your Railway project add the **Postgres** plugin (Create → Database → Postgres). Railway provisions the database and exposes credentials as environment variables (`DATABASE_URL`, `PGHOST`, `PGUSER`, etc.).
+2. Link the Postgres plugin to the API service (Service → Variables → Link Service). When linked, the next deploy automatically injects the credentials; the API now accepts either the single `DATABASE_URL` value or the individual `PG*` variables that Railway provides.
+3. Define the remaining application secrets in Railway → Variables, e.g. `JWT_SECRET=my-strong-secret` (set `JWT_ISSUER` or other options if you need overrides).
+4. Redeploy (`railway up` locally or via the GitHub Actions workflow). If you still see `database configuration missing: provide DATABASE_URL or PG* env vars` in the logs, re-check that the Postgres plugin is attached to the service or manually set `DATABASE_URL` under Variables.

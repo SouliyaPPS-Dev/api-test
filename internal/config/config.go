@@ -3,6 +3,8 @@ package config
 import (
 	"bufio"
 	"fmt"
+	"net"
+	neturl "net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -30,7 +32,7 @@ func Load() (Config, error) {
 
 	cfg := Config{
 		HTTPPort:        getEnv("HTTP_PORT", "8080"),
-		DatabaseURL:     os.Getenv("DATABASE_URL"),
+		DatabaseURL:     resolveDatabaseURL(),
 		JWTSecret:       getEnv("JWT_SECRET", ""),
 		JWTIssuer:       getEnv("JWT_ISSUER", "backoffice"),
 		JWTExpiry:       getDurationEnv("JWT_EXPIRY", 12*time.Hour),
@@ -41,7 +43,7 @@ func Load() (Config, error) {
 	}
 
 	if cfg.DatabaseURL == "" {
-		return Config{}, fmt.Errorf("DATABASE_URL is required")
+		return Config{}, fmt.Errorf("database configuration missing: provide DATABASE_URL or PG* env vars")
 	}
 	if cfg.JWTSecret == "" {
 		return Config{}, fmt.Errorf("JWT_SECRET is required")
@@ -86,6 +88,43 @@ func splitCSV(value string) []string {
 		return []string{"*"}
 	}
 	return parts
+}
+
+func resolveDatabaseURL() string {
+	if url := os.Getenv("DATABASE_URL"); url != "" {
+		return url
+	}
+
+	host := os.Getenv("PGHOST")
+	user := os.Getenv("PGUSER")
+	database := os.Getenv("PGDATABASE")
+	if host == "" || user == "" || database == "" {
+		return ""
+	}
+
+	port := getEnv("PGPORT", "5432")
+	password := os.Getenv("PGPASSWORD")
+	sslMode := getEnv("PGSSLMODE", "require")
+
+	dsn := &neturl.URL{
+		Scheme: "postgres",
+		Host:   net.JoinHostPort(host, port),
+		Path:   "/" + database,
+	}
+
+	if password != "" {
+		dsn.User = neturl.UserPassword(user, password)
+	} else {
+		dsn.User = neturl.User(user)
+	}
+
+	query := dsn.Query()
+	if sslMode != "" && query.Get("sslmode") == "" {
+		query.Set("sslmode", sslMode)
+	}
+	dsn.RawQuery = query.Encode()
+
+	return dsn.String()
 }
 
 func loadDotEnv(path string) error {
