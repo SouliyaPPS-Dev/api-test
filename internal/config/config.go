@@ -92,7 +92,7 @@ func splitCSV(value string) []string {
 
 func resolveDatabaseURL() string {
 	if url := os.Getenv("DATABASE_URL"); url != "" {
-		return url
+		return normalisePostgresScheme(url)
 	}
 
 	host := os.Getenv("PGHOST")
@@ -124,7 +124,14 @@ func resolveDatabaseURL() string {
 	}
 	dsn.RawQuery = query.Encode()
 
-	return dsn.String()
+	return normalisePostgresScheme(dsn.String())
+}
+
+func normalisePostgresScheme(url string) string {
+	if strings.HasPrefix(url, "postgresql://") {
+		return "postgres://" + strings.TrimPrefix(url, "postgresql://")
+	}
+	return url
 }
 
 func loadDotEnv(path string) error {
