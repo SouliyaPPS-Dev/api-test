@@ -1,0 +1,12 @@
+.git
+.gocache
+.gomodcache
+.air.toml
+.env
+.env.docker
+.env.local
+.env.development
+.env.production
+tmp
+postman
+server.log

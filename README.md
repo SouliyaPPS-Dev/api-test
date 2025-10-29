@@ -126,3 +126,65 @@ export GOMODCACHE=$(pwd)/.gomodcache
 export GOCACHE=$(pwd)/.gocache
 go test ./...
 ```
+
+## Docker
+
+Build the production image locally:
+
+```bash
+docker build -t backoffice-backend .
+```
+
+Run the container (configure environment variables to match your Railway deployment):
+
+```bash
+docker run --rm -p 8080:8080 \
+  -e DATABASE_URL=postgres://... \
+  -e JWT_SECRET=super-secret \
+  -e JWT_ISSUER=backoffice \
+  backoffice-backend
+```
+
+### Docker Compose (API + Postgres)
+
+For local development with PostgreSQL:
+
+```bash
+docker compose up --build
+```
+
+This starts:
+
+- `api`: the Go application running on `http://localhost:8080`
+- `postgres`: PostgreSQL 16 on `localhost:5432` with database `test`
+
+The API uses the default `DATABASE_URL=postgres://postgres:postgres@postgres:5432/test?sslmode=disable`. Override `POSTGRES_DB`, `POSTGRES_USER`, or `POSTGRES_PASSWORD` with shell environment variables when launching `docker compose`.
+
+To override application secrets, set them in your shell before starting Compose (e.g. `export JWT_SECRET=my-secret`) or create a `.env` file in this directory—Compose will substitute them automatically.
+
+To shut everything down and remove the database volume:
+
+```bash
+docker compose down -v
+```
+
+## CI/CD (Railway)
+
+Automated testing and deployment to Railway run from `.github/workflows/railway-deploy.yml`. The workflow:
+
+- Runs on pushes to the `main` branch (and can be triggered manually).
+- Executes `go test ./...`.
+- Installs the Railway CLI and calls `railway up`, which builds from the repository `Dockerfile`.
+
+Configure these GitHub secrets before enabling the workflow:
+
+- `RAILWAY_TOKEN` – Railway project token with deploy permissions.
+- `RAILWAY_SERVICE_ID` – Target service identifier in Railway.
+- `RAILWAY_ENVIRONMENT_ID` *(optional)* – Deploy to a non-default environment if required.
+
+### Railway Postgres Setup
+
+1. In Railway, add a **Postgres** plugin to the project that hosts this API.
+2. Copy the generated `DATABASE_URL` (Railway injects it automatically into the API service when linked).
+3. Make sure the API service has `JWT_SECRET`, `JWT_ISSUER`, and any other runtime configuration set in Railway variables.
+4. The GitHub workflow deploys via `railway up`, which builds the Docker image defined in `Dockerfile`. No extra database provisioning steps are required—the Railway Postgres service is attached by linking the service to the plugin.
