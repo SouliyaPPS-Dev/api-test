@@ -39,6 +39,9 @@ func main() {
 		log.Fatalf("failed to connect to database: %v", err)
 	}
 	defer db.Close()
+	if err := db.Migrate(rootCtx); err != nil {
+		log.Fatalf("failed to run database migrations: %v", err)
+	}
 
 	tokenManager := token.NewJWTManager(cfg.JWTSecret, cfg.JWTExpiry, cfg.JWTIssuer)
 
