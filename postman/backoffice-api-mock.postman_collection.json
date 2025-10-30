@@ -11,7 +11,7 @@
       "value": "http://localhost:8080"
     },
     {
-      "key": "authToken",
+      "key": "accessToken",
       "value": ""
     },
     {
@@ -143,6 +143,39 @@
         },
         {
           "name": "POST Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let token = \"\";",
+                  "try {",
+                  "  const body = pm.response.json();",
+                  "  token = body.accessToken",
+                  "    || body.token",
+                  "    || (body.data && (body.data.accessToken || body.data.token))",
+                  "    || \"\";",
+                  "} catch (error) {",
+                  "  console.warn(\"Unable to parse login response\", error);",
+                  "}",
+                  "if (token) {",
+                  "  pm.collectionVariables.set(\"accessToken\", token);",
+                  "  pm.collectionVariables.set(\"authToken\", token);",
+                  "  pm.test(\"Stored access token\", function () {",
+                  "    pm.expect(token.length).to.be.greaterThan(0);",
+                  "  });",
+                  "} else {",
+                  "  pm.collectionVariables.unset(\"accessToken\");",
+                  "  pm.collectionVariables.unset(\"authToken\");",
+                  "  pm.test(\"Access token missing\", function () {",
+                  "    pm.expect(token, \"token\").to.be.a(\"string\").that.is.not.empty;",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -206,7 +239,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"token\": \"{{authToken}}\",\n  \"user\": {\n    \"id\": \"usr-123\",\n    \"email\": \"admin@example.com\",\n    \"name\": \"Admin User\"\n  }\n}"
+              "body": "{\n  \"token\": \"{{accessToken}}\",\n  \"user\": {\n    \"id\": \"usr-123\",\n    \"email\": \"admin@example.com\",\n    \"name\": \"Admin User\"\n  }\n}"
             }
           ]
         }
@@ -219,7 +252,7 @@
         "bearer": [
           {
             "key": "token",
-            "value": "{{authToken}}",
+            "value": "{{accessToken}}",
             "type": "string"
           }
         ]

@@ -18,7 +18,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.25'
+          go-version: '1.24.3'
           cache: true
 
       - name: Run tests
@@ -32,26 +32,85 @@ jobs:
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 
-      - name: Sync DATABASE_URL to Railway
+      - name: Require deployment secrets
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
+        run: |
+          set -euo pipefail
+          missing=()
+          if [ -z "${RAILWAY_TOKEN:-}" ]; then missing+=("RAILWAY_TOKEN"); fi
+          if [ -z "${RAILWAY_SERVICE_ID:-}" ]; then missing+=("RAILWAY_SERVICE_ID"); fi
+          if [ ${#missing[@]} -gt 0 ]; then
+            printf 'Missing required GitHub secrets: %s\n' "${missing[*]}" >&2
+            exit 1
+          fi
+
+      - name: Sync environment variables to Railway
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
           RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
           RAILWAY_ENVIRONMENT_ID: ${{ secrets.RAILWAY_ENVIRONMENT_ID }}
           DATABASE_URL_SECRET: ${{ secrets.RAILWAY_DATABASE_URL }}
+          JWT_SECRET_SECRET: ${{ secrets.RAILWAY_JWT_SECRET }}
+          JWT_ISSUER_SECRET: ${{ secrets.RAILWAY_JWT_ISSUER }}
         run: |
           set -euo pipefail
-          if [ -z "${DATABASE_URL_SECRET:-}" ]; then
-            echo "DATABASE_URL secret not provided; skipping sync."
+          declare -a kvs=()
+          if [ -n "${DATABASE_URL_SECRET:-}" ]; then
+            kvs+=("DATABASE_URL=${DATABASE_URL_SECRET}")
+          fi
+          if [ -n "${JWT_SECRET_SECRET:-}" ]; then
+            kvs+=("JWT_SECRET=${JWT_SECRET_SECRET}")
+          fi
+          if [ -n "${JWT_ISSUER_SECRET:-}" ]; then
+            kvs+=("JWT_ISSUER=${JWT_ISSUER_SECRET}")
+          fi
+
+          if [ ${#kvs[@]} -eq 0 ]; then
+            echo "No variables provided; skipping sync."
             exit 0
           fi
-          args=(variables set "DATABASE_URL=${DATABASE_URL_SECRET}")
+          for kv in "${kvs[@]}"; do
+            args=(variables set "${kv}")
+            if [ -n "${RAILWAY_SERVICE_ID:-}" ]; then
+              args+=(--service "${RAILWAY_SERVICE_ID}")
+            fi
+            if [ -n "${RAILWAY_ENVIRONMENT_ID:-}" ]; then
+              args+=(--environment "${RAILWAY_ENVIRONMENT_ID}")
+            fi
+            railway "${args[@]}"
+          done
+
+      - name: Validate Railway variables
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
+          RAILWAY_ENVIRONMENT_ID: ${{ secrets.RAILWAY_ENVIRONMENT_ID }}
+        run: |
+          set -euo pipefail
+          list_args=(variables list)
           if [ -n "${RAILWAY_SERVICE_ID:-}" ]; then
-            args+=(--service "${RAILWAY_SERVICE_ID}")
+            list_args+=(--service "${RAILWAY_SERVICE_ID}")
           fi
           if [ -n "${RAILWAY_ENVIRONMENT_ID:-}" ]; then
-            args+=(--environment "${RAILWAY_ENVIRONMENT_ID}")
+            list_args+=(--environment "${RAILWAY_ENVIRONMENT_ID}")
           fi
-          railway "${args[@]}"
+
+          vars_output="$(railway "${list_args[@]}")"
+          required=(DATABASE_URL JWT_SECRET)
+          missing=()
+          for key in "${required[@]}"; do
+            if ! printf '%s\n' "${vars_output}" | grep -E "^[[:space:]]*${key}[[:space:]]" >/dev/null; then
+              missing+=("${key}")
+            fi
+          done
+
+          if [ ${#missing[@]} -gt 0 ]; then
+            printf 'Railway environment is missing required variables: %s\n' "${missing[*]}" >&2
+            printf 'Add them via Railway Variables UI or provide GitHub secrets (RAILWAY_DATABASE_URL / RAILWAY_JWT_SECRET) so this workflow can sync them automatically.\n' >&2
+            exit 1
+          fi
 
       - name: Deploy to Railway
         env:

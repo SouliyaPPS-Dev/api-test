@@ -30,8 +30,13 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("loading .env: %w", err)
 	}
 
+	httpPort := getEnv("HTTP_PORT", "")
+	if httpPort == "" {
+		httpPort = getEnv("PORT", "8080")
+	}
+
 	cfg := Config{
-		HTTPPort:        getEnv("HTTP_PORT", "8080"),
+		HTTPPort:        httpPort,
 		DatabaseURL:     resolveDatabaseURL(),
 		JWTSecret:       getEnv("JWT_SECRET", ""),
 		JWTIssuer:       getEnv("JWT_ISSUER", "backoffice"),
@@ -91,37 +96,84 @@ func splitCSV(value string) []string {
 }
 
 func resolveDatabaseURL() string {
-	for _, key := range []string{"DATABASE_URL", "DATABASE_PUBLIC_URL", "POSTGRES_URL"} {
+	for _, key := range []string{
+		"DATABASE_URL",
+		"DATABASE_PUBLIC_URL",
+		"DATABASE_INTERNAL_URL",
+		"DATABASE_EXTERNAL_URL",
+		"DATABASE_URL_NO_SSL",
+		"DATABASE_DIRECT_URL",
+		"POSTGRES_URL",
+		"PGURL",
+		"RAILWAY_DATABASE_URL",
+	} {
 		if url := os.Getenv(key); url != "" {
 			return normalisePostgresScheme(url)
+		}
+	}
+
+	for _, key := range []string{"DATABASE_URL_FILE", "PGURL_FILE"} {
+		if urlFromFile := readEnvFile(key); urlFromFile != "" {
+			return normalisePostgresScheme(urlFromFile)
 		}
 	}
 
 	host := firstNonEmpty(
 		os.Getenv("PGHOST"),
 		os.Getenv("POSTGRES_HOST"),
+		os.Getenv("POSTGRESQL_ADDON_HOST"),
+		os.Getenv("DATABASE_HOST"),
 		os.Getenv("RAILWAY_TCP_PROXY_DOMAIN"),
 		os.Getenv("RAILWAY_PRIVATE_DOMAIN"),
 	)
-	user := firstNonEmpty(os.Getenv("PGUSER"), os.Getenv("POSTGRES_USER"))
+	user := firstNonEmpty(
+		os.Getenv("PGUSER"),
+		os.Getenv("POSTGRES_USER"),
+		os.Getenv("POSTGRESQL_ADDON_USER"),
+		os.Getenv("DATABASE_USERNAME"),
+		os.Getenv("DATABASE_USER"),
+	)
 	if user == "" {
 		if dbUser := os.Getenv("DATABASE_USER"); dbUser != "" {
 			user = dbUser
 		}
 	}
-	password := firstNonEmpty(os.Getenv("PGPASSWORD"), os.Getenv("POSTGRES_PASSWORD"))
+	password := firstNonEmpty(
+		os.Getenv("PGPASSWORD"),
+		os.Getenv("POSTGRES_PASSWORD"),
+		os.Getenv("POSTGRESQL_ADDON_PASSWORD"),
+		os.Getenv("DATABASE_PASSWORD"),
+	)
 	if password == "" {
 		password = os.Getenv("DATABASE_PASSWORD")
 	}
-	database := firstNonEmpty(os.Getenv("PGDATABASE"), os.Getenv("POSTGRES_DB"), os.Getenv("DATABASE_NAME"))
-	port := firstNonEmpty(os.Getenv("PGPORT"), os.Getenv("RAILWAY_TCP_PROXY_PORT"))
+	database := firstNonEmpty(
+		os.Getenv("PGDATABASE"),
+		os.Getenv("POSTGRES_DB"),
+		os.Getenv("POSTGRES_DATABASE"),
+		os.Getenv("POSTGRESQL_ADDON_DB"),
+		os.Getenv("DATABASE_NAME"),
+	)
+	port := firstNonEmpty(
+		os.Getenv("PGPORT"),
+		os.Getenv("POSTGRES_PORT"),
+		os.Getenv("POSTGRESQL_ADDON_PORT"),
+		os.Getenv("DATABASE_PORT"),
+		os.Getenv("RAILWAY_TCP_PROXY_PORT"),
+	)
 	if port == "" {
 		port = "5432"
 	}
-	sslMode := firstNonEmpty(os.Getenv("PGSSLMODE"), os.Getenv("PGSSL_MODE"), "require")
+	sslMode := firstNonEmpty(
+		os.Getenv("PGSSLMODE"),
+		os.Getenv("PGSSL_MODE"),
+		os.Getenv("PGSSL"),
+		os.Getenv("POSTGRES_SSL_MODE"),
+		"require",
+	)
 
 	if database == "" {
-		return ""
+		database = firstNonEmpty(user, "postgres")
 	}
 
 	dsn := &neturl.URL{
@@ -166,6 +218,19 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func readEnvFile(key string) string {
+	path := os.Getenv(key)
+	if path == "" {
+		return ""
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(data))
 }
 
 func loadDotEnv(path string) error {

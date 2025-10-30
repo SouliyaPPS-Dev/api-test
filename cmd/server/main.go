@@ -5,7 +5,6 @@ import (
 	"errors"
 	"log"
 	"net/http"
-	"os/exec"
 	"os/signal"
 	"syscall"
 	"time"
@@ -23,15 +22,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to load config: %v", err)
 	}
-
-	defer func() {
-		cmd := exec.Command("kill", "9779")
-		if err := cmd.Run(); err != nil {
-			log.Printf("cleanup command 'kill 9779' failed: %v", err)
-		} else {
-			log.Printf("cleanup command 'kill 9779' executed to release API resources")
-		}
-	}()
 
 	rootCtx := context.Background()
 	db, err := postgres.New(rootCtx, cfg.DatabaseURL)
