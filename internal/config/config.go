@@ -96,6 +96,7 @@ func splitCSV(value string) []string {
 }
 
 func resolveDatabaseURL() string {
+	preferPublic := preferPublicRailwayURL()
 	for _, key := range []string{
 		"DATABASE_URL",
 		"DATABASE_PUBLIC_URL",
@@ -109,11 +110,20 @@ func resolveDatabaseURL() string {
 		"RAILWAY_PUBLIC_URL",
 	} {
 		if url := os.Getenv(key); url != "" {
+			if key == "DATABASE_URL" && preferPublic && isRailwayInternalURL(url) {
+				continue
+			}
 			if coerced := coerceDatabaseURL(url); coerced != "" {
 				return coerced
 			}
 		}
 	}
+
+	publicFallback := firstNonEmpty(
+		os.Getenv("DATABASE_PUBLIC_URL"),
+		os.Getenv("DATABASE_EXTERNAL_URL"),
+		os.Getenv("RAILWAY_PUBLIC_URL"),
+	)
 
 	for _, key := range []string{"DATABASE_URL_FILE", "PGURL_FILE"} {
 		if urlFromFile := readEnvFile(key); urlFromFile != "" {
@@ -190,6 +200,13 @@ func resolveDatabaseURL() string {
 	if host == "" {
 		return ""
 	}
+
+	if preferPublic && isRailwayInternalHostname(host) {
+		if coerced := coerceDatabaseURL(publicFallback); coerced != "" {
+			return coerced
+		}
+	}
+
 	dsn.Host = net.JoinHostPort(host, port)
 
 	if user == "" {
@@ -230,6 +247,40 @@ func coerceDatabaseURL(raw string) string {
 		return normalisePostgresScheme(raw)
 	}
 	return ""
+}
+
+func preferPublicRailwayURL() bool {
+	if runningInsideRailway() {
+		return false
+	}
+	return true
+}
+
+func runningInsideRailway() bool {
+	for _, key := range []string{
+		"RAILWAY_STATIC_URL",
+		"RAILWAY_ENVIRONMENT",
+		"RAILWAY_PROJECT_ID",
+		"RAILWAY_SERVICE_ID",
+	} {
+		if os.Getenv(key) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func isRailwayInternalURL(raw string) bool {
+	parsed, err := neturl.Parse(normalisePostgresScheme(strings.TrimSpace(raw)))
+	if err != nil {
+		return false
+	}
+	host := parsed.Hostname()
+	return isRailwayInternalHostname(host)
+}
+
+func isRailwayInternalHostname(host string) bool {
+	return strings.HasSuffix(host, ".railway.internal")
 }
 
 func firstNonEmpty(values ...string) string {

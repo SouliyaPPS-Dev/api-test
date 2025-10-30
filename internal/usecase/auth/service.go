@@ -113,6 +113,34 @@ func (s *Service) VerifyToken(ctx context.Context, token string) (*domain.User, 
 	return sanitizeUser(user), nil
 }
 
+// RenewToken issues a new access token for the user encoded in the provided token.
+func (s *Service) RenewToken(ctx context.Context, token string) (string, error) {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return "", domain.ErrTokenInvalid
+	}
+
+	userID, err := s.tokens.ExtractUserID(token)
+	if err != nil {
+		return "", domain.ErrTokenInvalid
+	}
+
+	user, err := s.users.GetByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, domain.ErrUserNotFound) {
+			return "", domain.ErrTokenInvalid
+		}
+		return "", err
+	}
+
+	newToken, err := s.tokens.Generate(user.ID)
+	if err != nil {
+		return "", err
+	}
+
+	return newToken, nil
+}
+
 func sanitizeUser(u *domain.User) *domain.User {
 	if u == nil {
 		return nil

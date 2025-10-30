@@ -242,6 +242,95 @@
               "body": "{\n  \"token\": \"{{accessToken}}\",\n  \"user\": {\n    \"id\": \"usr-123\",\n    \"email\": \"admin@example.com\",\n    \"name\": \"Admin User\"\n  }\n}"
             }
           ]
+        },
+        {
+          "name": "POST Renew Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let token = \"\";",
+                  "try {",
+                  "  const body = pm.response.json();",
+                  "  token = body.accessToken",
+                  "    || body.token",
+                  "    || (body.data && (body.data.accessToken || body.data.token))",
+                  "    || \"\";",
+                  "} catch (error) {",
+                  "  console.warn(\"Unable to parse renew response\", error);",
+                  "}",
+                  "if (token) {",
+                  "  pm.collectionVariables.set(\"accessToken\", token);",
+                  "  pm.collectionVariables.set(\"authToken\", token);",
+                  "  pm.test(\"Stored renewed token\", function () {",
+                  "    pm.expect(token.length).to.be.greaterThan(0);",
+                  "  });",
+                  "} else {",
+                  "  pm.collectionVariables.unset(\"accessToken\");",
+                  "  pm.collectionVariables.unset(\"authToken\");",
+                  "  pm.test(\"Renewed token missing\", function () {",
+                  "    pm.expect(token, \"token\").to.be.a(\"string\").that.is.not.empty;",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/renew",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "renew"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/auth/renew",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "renew"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"token\": \"<new access token>\"\n}"
+            }
+          ]
         }
       ]
     },

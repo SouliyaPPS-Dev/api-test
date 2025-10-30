@@ -68,3 +68,32 @@ func (m *JWTManager) Validate(tokenString string) (string, error) {
 	}
 	return claims.UserID, nil
 }
+
+// ExtractUserID returns the user identifier embedded in the token without enforcing expiry.
+func (m *JWTManager) ExtractUserID(tokenString string) (string, error) {
+	parser := jwt.NewParser(jwt.WithoutClaimsValidation())
+	token, err := parser.ParseWithClaims(tokenString, &Claims{}, func(t *jwt.Token) (any, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, errors.New("unexpected signing method")
+		}
+		return m.secret, nil
+	})
+	if err != nil {
+		return "", err
+	}
+
+	claims, ok := token.Claims.(*Claims)
+	if !ok {
+		return "", errors.New("invalid token claims")
+	}
+
+	if claims.UserID == "" {
+		return "", errors.New("user id missing in token")
+	}
+
+	if m.issuer != "" && claims.Issuer != m.issuer {
+		return "", errors.New("invalid token issuer")
+	}
+
+	return claims.UserID, nil
+}

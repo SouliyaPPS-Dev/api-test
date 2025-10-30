@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strings"
 
@@ -16,6 +17,7 @@ func (s *Server) registerRoutes() {
 	s.router.Handle("/health", http.HandlerFunc(s.handleHealth))
 	s.router.Handle("/auth/register", http.HandlerFunc(s.handleRegister))
 	s.router.Handle("/auth/login", http.HandlerFunc(s.handleLogin))
+	s.router.Handle("/auth/renew", http.HandlerFunc(s.handleRenewToken))
 
 	authenticated := s.authMiddleware
 	s.router.Handle("/products", authenticated(http.HandlerFunc(s.handleProducts)))
@@ -89,6 +91,48 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"token": token,
 		"user":  user,
+	})
+}
+
+func (s *Server) handleRenewToken(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeMethodNotAllowed(w, http.MethodPost)
+		return
+	}
+
+	token := extractBearerToken(r.Header.Get("Authorization"))
+	if token == "" {
+		var payload struct {
+			Token string `json:"token"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			if errors.Is(err, io.EOF) {
+				writeError(w, http.StatusBadRequest, "token required")
+			} else {
+				writeError(w, http.StatusBadRequest, "invalid JSON payload")
+			}
+			return
+		}
+		token = strings.TrimSpace(payload.Token)
+	}
+
+	if token == "" {
+		writeError(w, http.StatusBadRequest, "token required")
+		return
+	}
+
+	newToken, err := s.authService.RenewToken(r.Context(), token)
+	if err != nil {
+		if errors.Is(err, authdomain.ErrTokenInvalid) {
+			writeError(w, http.StatusUnauthorized, err.Error())
+		} else {
+			writeError(w, http.StatusBadRequest, err.Error())
+		}
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"token": newToken,
 	})
 }
 
