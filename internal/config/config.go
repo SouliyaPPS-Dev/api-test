@@ -48,7 +48,7 @@ func Load() (Config, error) {
 	}
 
 	if cfg.DatabaseURL == "" {
-		return Config{}, fmt.Errorf("database configuration missing: provide DATABASE_URL or PG* env vars")
+		return Config{}, fmt.Errorf("database configuration missing: provide DATABASE_URL or PG* env vars (on Railway: Service → Variables → +New → reference your database's DATABASE_URL)")
 	}
 	if cfg.JWTSecret == "" {
 		return Config{}, fmt.Errorf("JWT_SECRET is required")
