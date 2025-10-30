@@ -218,6 +218,11 @@ func normalisePostgresScheme(url string) string {
 
 func coerceDatabaseURL(raw string) string {
 	raw = strings.TrimSpace(raw)
+	if len(raw) >= 2 {
+		if (raw[0] == '"' && raw[len(raw)-1] == '"') || (raw[0] == '\'' && raw[len(raw)-1] == '\'') {
+			raw = raw[1 : len(raw)-1]
+		}
+	}
 	if raw == "" {
 		return ""
 	}
