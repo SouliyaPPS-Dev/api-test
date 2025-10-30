@@ -98,17 +98,62 @@ jobs:
           fi
 
           vars_output="$(railway "${list_args[@]}")"
-          required=(DATABASE_URL JWT_SECRET)
-          missing=()
-          for key in "${required[@]}"; do
-            if ! printf '%s\n' "${vars_output}" | grep -E "^[[:space:]]*${key}[[:space:]]" >/dev/null; then
-              missing+=("${key}")
+
+          get_args=(variables get)
+          if [ -n "${RAILWAY_SERVICE_ID:-}" ]; then
+            get_args+=(--service "${RAILWAY_SERVICE_ID}")
+          fi
+          if [ -n "${RAILWAY_ENVIRONMENT_ID:-}" ]; then
+            get_args+=(--environment "${RAILWAY_ENVIRONMENT_ID}")
+          fi
+
+          db_candidates=(
+            DATABASE_URL
+            DATABASE_PUBLIC_URL
+            DATABASE_INTERNAL_URL
+            DATABASE_EXTERNAL_URL
+            DATABASE_URL_NO_SSL
+            DATABASE_DIRECT_URL
+            POSTGRES_URL
+            PGURL
+            RAILWAY_DATABASE_URL
+            RAILWAY_PUBLIC_URL
+          )
+
+          db_found=false
+          for key in "${db_candidates[@]}"; do
+            value="$(railway "${get_args[@]}" "${key}" 2>/dev/null || true)"
+            value="$(printf '%s' "${value}" | tr -d '\r\n')"
+            if [ -z "${value}" ]; then
+              continue
+            fi
+            if [ "${key}" = "RAILWAY_PUBLIC_URL" ]; then
+              case "${value}" in
+                postgres://*|postgresql://*)
+                  db_found=true
+                  break
+                ;;
+                *)
+                  continue
+                ;;
+              esac
+            else
+              db_found=true
+              break
             fi
           done
 
-          if [ ${#missing[@]} -gt 0 ]; then
-            printf 'Railway environment is missing required variables: %s\n' "${missing[*]}" >&2
-            printf 'Add them via Railway Variables UI or provide GitHub secrets (RAILWAY_DATABASE_URL / RAILWAY_JWT_SECRET) so this workflow can sync them automatically.\n' >&2
+          if [ "${db_found}" != "true" ]; then
+            printf 'Railway environment is missing a database connection string.\n' >&2
+            printf 'Set one of: %s\n' "${db_candidates[*]}" >&2
+            exit 1
+          fi
+
+          jwt_value="$(railway "${get_args[@]}" JWT_SECRET 2>/dev/null || true)"
+          jwt_value="$(printf '%s' "${jwt_value}" | tr -d '\r\n')"
+          if [ -z "${jwt_value}" ]; then
+            printf 'Railway environment is missing JWT_SECRET.\n' >&2
+            printf 'Add it via Railway Variables UI or provide the RAILWAY_JWT_SECRET GitHub secret.\n' >&2
             exit 1
           fi
 
@@ -127,3 +172,21 @@ jobs:
             args+=(--environment "${RAILWAY_ENVIRONMENT_ID}")
           fi
           railway "${args[@]}"
+
+      - name: Smoke test public endpoint
+        env:
+          PUBLIC_BASE_URL: ${{ secrets.RAILWAY_PUBLIC_URL }}
+        run: |
+          set -euo pipefail
+          base_url="${PUBLIC_BASE_URL:-https://api-test-production-2d7d.up.railway.app}"
+          echo "Checking ${base_url}/health"
+          for attempt in {1..10}; do
+            if curl -fsS "${base_url}/health" | grep -Eq '"status"[[:space:]]*:[[:space:]]*"ok"'; then
+              echo "Public health check succeeded."
+              exit 0
+            fi
+            echo "Health check attempt ${attempt} failed; retrying in 5s..."
+            sleep 5
+          done
+          echo "Health check failed after multiple attempts." >&2
+          exit 1

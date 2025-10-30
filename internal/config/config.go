@@ -106,15 +106,20 @@ func resolveDatabaseURL() string {
 		"POSTGRES_URL",
 		"PGURL",
 		"RAILWAY_DATABASE_URL",
+		"RAILWAY_PUBLIC_URL",
 	} {
 		if url := os.Getenv(key); url != "" {
-			return normalisePostgresScheme(url)
+			if coerced := coerceDatabaseURL(url); coerced != "" {
+				return coerced
+			}
 		}
 	}
 
 	for _, key := range []string{"DATABASE_URL_FILE", "PGURL_FILE"} {
 		if urlFromFile := readEnvFile(key); urlFromFile != "" {
-			return normalisePostgresScheme(urlFromFile)
+			if coerced := coerceDatabaseURL(urlFromFile); coerced != "" {
+				return coerced
+			}
 		}
 	}
 
@@ -209,6 +214,17 @@ func normalisePostgresScheme(url string) string {
 		return "postgres://" + strings.TrimPrefix(url, "postgresql://")
 	}
 	return url
+}
+
+func coerceDatabaseURL(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	if strings.HasPrefix(raw, "postgres://") || strings.HasPrefix(raw, "postgresql://") {
+		return normalisePostgresScheme(raw)
+	}
+	return ""
 }
 
 func firstNonEmpty(values ...string) string {
