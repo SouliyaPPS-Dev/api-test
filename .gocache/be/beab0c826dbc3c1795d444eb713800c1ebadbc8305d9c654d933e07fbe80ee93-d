@@ -1,4 +1,0 @@
-./handlers.go
-./middleware.go
-./response.go
-./server.go

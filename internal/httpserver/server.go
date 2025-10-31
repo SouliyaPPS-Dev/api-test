@@ -9,6 +9,7 @@ import (
 	"backoffice/backend/internal/config"
 	authusecase "backoffice/backend/internal/usecase/auth"
 	productusecase "backoffice/backend/internal/usecase/product"
+	userusecase "backoffice/backend/internal/usecase/user"
 )
 
 // Server wraps the HTTP server lifecycle.
@@ -17,12 +18,13 @@ type Server struct {
 	router         *http.ServeMux
 	authService    *authusecase.Service
 	productService *productusecase.Service
+	userService    *userusecase.Service
 	allowedOrigins []string
 	addr           string
 }
 
 // NewServer constructs a new Server with configured dependencies.
-func NewServer(cfg config.Config, authService *authusecase.Service, productService *productusecase.Service) *Server {
+func NewServer(cfg config.Config, authService *authusecase.Service, userService *userusecase.Service, productService *productusecase.Service) *Server {
 	mux := http.NewServeMux()
 	addr := cfg.HTTPPort
 	if !strings.Contains(addr, ":") {
@@ -40,6 +42,7 @@ func NewServer(cfg config.Config, authService *authusecase.Service, productServi
 		},
 		router:         mux,
 		authService:    authService,
+		userService:    userService,
 		productService: productService,
 		allowedOrigins: cfg.AllowedOrigins,
 		addr:           addr,

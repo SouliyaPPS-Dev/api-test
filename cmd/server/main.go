@@ -15,6 +15,7 @@ import (
 	"backoffice/backend/internal/infrastructure/token"
 	authusecase "backoffice/backend/internal/usecase/auth"
 	productusecase "backoffice/backend/internal/usecase/product"
+	userusecase "backoffice/backend/internal/usecase/user"
 )
 
 func main() {
@@ -35,10 +36,12 @@ func main() {
 
 	tokenManager := token.NewJWTManager(cfg.JWTSecret, cfg.JWTExpiry, cfg.JWTIssuer)
 
-	authService := authusecase.NewService(postgres.NewUserRepository(db.Pool), tokenManager)
+	userRepo := postgres.NewUserRepository(db.Pool)
+	authService := authusecase.NewService(userRepo, tokenManager)
+	userService := userusecase.NewService(userRepo)
 	productService := productusecase.NewService(postgres.NewProductRepository(db.Pool))
 
-	server := httpserver.NewServer(cfg, authService, productService)
+	server := httpserver.NewServer(cfg, authService, userService, productService)
 	log.Printf("HTTP server listening on %s", server.Addr())
 
 	go func() {

@@ -5,7 +5,9 @@ dist/
 
 # Go build caches
 .gocache/
+.gocache
 .gomodcache/
+.gomodcache
 
 # Go test/build artifacts
 *.test

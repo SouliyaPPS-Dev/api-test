@@ -14,6 +14,22 @@ var (
 	ErrTokenInvalid = errors.New("token invalid or expired")
 	// ErrUserNotFound indicates missing user.
 	ErrUserNotFound = errors.New("user not found")
+	// ErrInvalidRole indicates the provided role is not supported.
+	ErrInvalidRole = errors.New("invalid role")
+	// ErrPasswordMismatch indicates the current password is incorrect.
+	ErrPasswordMismatch = errors.New("current password does not match")
+	// ErrPasswordUnchanged indicates the new password matches the current one.
+	ErrPasswordUnchanged = errors.New("new password must be different from current password")
+)
+
+// UserRole identifies the privileges assigned to a user.
+type UserRole string
+
+const (
+	// RoleUser represents a standard application user.
+	RoleUser UserRole = "user"
+	// RoleAdmin represents an administrative user.
+	RoleAdmin UserRole = "admin"
 )
 
 // User models the authentication entity persisted in storage.
@@ -21,6 +37,7 @@ type User struct {
 	ID           string
 	Email        string
 	Name         string
+	Role         UserRole
 	PasswordHash string
 	CreatedAt    time.Time
 	UpdatedAt    time.Time

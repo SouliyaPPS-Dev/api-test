@@ -32,6 +32,7 @@ func NewService(users domain.UserRepository, tokens TokenManager) *Service {
 func (s *Service) Register(ctx context.Context, email, password, name string) (*domain.User, error) {
 	email = strings.TrimSpace(strings.ToLower(email))
 	password = strings.TrimSpace(password)
+	name = strings.TrimSpace(name)
 	if email == "" {
 		return nil, errors.New("email is required")
 	}
@@ -54,7 +55,8 @@ func (s *Service) Register(ctx context.Context, email, password, name string) (*
 	user := &domain.User{
 		ID:           uuid.NewString(),
 		Email:        email,
-		Name:         strings.TrimSpace(name),
+		Name:         name,
+		Role:         domain.RoleUser,
 		PasswordHash: string(hashed),
 		CreatedAt:    now,
 		UpdatedAt:    now,
@@ -139,6 +141,38 @@ func (s *Service) RenewToken(ctx context.Context, token string) (string, error) 
 	}
 
 	return newToken, nil
+}
+
+// ChangePassword updates the password for the provided user after verifying the current one.
+func (s *Service) ChangePassword(ctx context.Context, userID, currentPassword, newPassword string) error {
+	currentPassword = strings.TrimSpace(currentPassword)
+	newPassword = strings.TrimSpace(newPassword)
+
+	if currentPassword == "" {
+		return errors.New("current password is required")
+	}
+	if newPassword == "" {
+		return errors.New("new password is required")
+	}
+	if newPassword == currentPassword {
+		return domain.ErrPasswordUnchanged
+	}
+
+	user, err := s.users.GetByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(currentPassword)); err != nil {
+		return domain.ErrPasswordMismatch
+	}
+
+	hashed, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	return s.users.UpdatePassword(ctx, userID, string(hashed), s.nowFunc().UTC())
 }
 
 func sanitizeUser(u *domain.User) *domain.User {
