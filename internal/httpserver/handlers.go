@@ -24,6 +24,7 @@ func (s *Server) registerRoutes() {
 	s.router.Handle("/products", authenticated(http.HandlerFunc(s.handleProducts)))
 	s.router.Handle("/products/", authenticated(http.HandlerFunc(s.handleProductByID)))
 	s.router.Handle("/users/change-password", authenticated(http.HandlerFunc(s.handleChangePassword)))
+	s.router.Handle("/users/me/role", authenticated(http.HandlerFunc(s.handleUserRole)))
 	s.router.Handle("/admin/users", authenticated(http.HandlerFunc(s.handleAdminUsers)))
 	s.router.Handle("/admin/users/", authenticated(http.HandlerFunc(s.handleAdminUserByID)))
 }
@@ -269,6 +270,66 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (s *Server) handleUserRole(w http.ResponseWriter, r *http.Request) {
+	user, ok := currentUserFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, http.StatusOK, map[string]any{
+			"user": user,
+		})
+	case http.MethodPut, http.MethodPatch:
+		var payload struct {
+			Role string `json:"role"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			if errors.Is(err, io.EOF) {
+				writeError(w, http.StatusBadRequest, "role is required")
+			} else {
+				writeError(w, http.StatusBadRequest, "invalid JSON payload")
+			}
+			return
+		}
+
+		role := strings.TrimSpace(payload.Role)
+		if role == "" {
+			writeError(w, http.StatusBadRequest, "role is required")
+			return
+		}
+
+		normalized := strings.ToLower(role)
+		if normalized == string(authdomain.RoleAdmin) && user.Role != authdomain.RoleAdmin {
+			writeError(w, http.StatusForbidden, "insufficient privileges to assign admin role")
+			return
+		}
+
+		user, err := s.userService.Update(r.Context(), user.ID, userusecase.UpdateInput{
+			Role: &role,
+		})
+		if err != nil {
+			switch {
+			case errors.Is(err, authdomain.ErrInvalidRole):
+				writeError(w, http.StatusBadRequest, err.Error())
+			case errors.Is(err, authdomain.ErrUserNotFound):
+				writeError(w, http.StatusNotFound, err.Error())
+			default:
+				writeError(w, http.StatusBadRequest, err.Error())
+			}
+			return
+		}
+
+		writeJSON(w, http.StatusOK, map[string]any{
+			"user": user,
+		})
+	default:
+		writeMethodNotAllowed(w, http.MethodGet, http.MethodPut, http.MethodPatch)
+	}
+}
+
 func (s *Server) handleAdminUsers(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
@@ -331,10 +392,28 @@ func (s *Server) handleAdminUsers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleAdminUserByID(w http.ResponseWriter, r *http.Request) {
-	id := strings.TrimPrefix(r.URL.Path, "/admin/users/")
-	id = strings.TrimSpace(id)
+	remainder := strings.TrimPrefix(r.URL.Path, "/admin/users/")
+	remainder = strings.TrimSpace(remainder)
+	remainder = strings.Trim(remainder, "/")
+	if remainder == "" {
+		writeError(w, http.StatusBadRequest, "user id required")
+		return
+	}
+
+	segments := strings.Split(remainder, "/")
+	id := strings.TrimSpace(segments[0])
 	if id == "" {
 		writeError(w, http.StatusBadRequest, "user id required")
+		return
+	}
+
+	if len(segments) > 1 {
+		switch strings.TrimSpace(segments[1]) {
+		case "role":
+			s.handleAdminUserRole(w, r, id)
+		default:
+			writeError(w, http.StatusNotFound, "resource not found")
+		}
 		return
 	}
 
@@ -403,6 +482,86 @@ func (s *Server) handleAdminUserByID(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
+	default:
+		writeMethodNotAllowed(w, http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodDelete)
+	}
+}
+
+func (s *Server) handleAdminUserRole(w http.ResponseWriter, r *http.Request, userID string) {
+	switch r.Method {
+	case http.MethodGet:
+		if !s.requireAdmin(w, r) {
+			return
+		}
+		user, err := s.userService.Get(r.Context(), userID)
+		if err != nil {
+			if errors.Is(err, authdomain.ErrUserNotFound) {
+				writeError(w, http.StatusNotFound, err.Error())
+			} else {
+				writeError(w, http.StatusBadRequest, err.Error())
+			}
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"user": user})
+	case http.MethodPut, http.MethodPatch:
+		if !s.requireAdmin(w, r) {
+			return
+		}
+
+		var payload struct {
+			Role string `json:"role"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			if errors.Is(err, io.EOF) {
+				writeError(w, http.StatusBadRequest, "role is required")
+			} else {
+				writeError(w, http.StatusBadRequest, "invalid JSON payload")
+			}
+			return
+		}
+
+		role := strings.TrimSpace(payload.Role)
+		if role == "" {
+			writeError(w, http.StatusBadRequest, "role is required")
+			return
+		}
+
+		user, err := s.userService.Update(r.Context(), userID, userusecase.UpdateInput{
+			Role: &role,
+		})
+		if err != nil {
+			switch {
+			case errors.Is(err, authdomain.ErrUserNotFound):
+				writeError(w, http.StatusNotFound, err.Error())
+			case errors.Is(err, authdomain.ErrInvalidRole):
+				writeError(w, http.StatusBadRequest, err.Error())
+			default:
+				writeError(w, http.StatusBadRequest, err.Error())
+			}
+			return
+		}
+
+		writeJSON(w, http.StatusOK, user)
+	case http.MethodDelete:
+		if !s.requireAdmin(w, r) {
+			return
+		}
+
+		defaultRole := string(authdomain.RoleUser)
+		user, err := s.userService.Update(r.Context(), userID, userusecase.UpdateInput{
+			Role: &defaultRole,
+		})
+		if err != nil {
+			switch {
+			case errors.Is(err, authdomain.ErrUserNotFound):
+				writeError(w, http.StatusNotFound, err.Error())
+			default:
+				writeError(w, http.StatusBadRequest, err.Error())
+			}
+			return
+		}
+
+		writeJSON(w, http.StatusOK, user)
 	default:
 		writeMethodNotAllowed(w, http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodDelete)
 	}
