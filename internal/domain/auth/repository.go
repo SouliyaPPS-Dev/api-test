@@ -18,5 +18,6 @@ type UserRepository interface {
 
 // UserFilter allows narrowing user queries.
 type UserFilter struct {
-	Role UserRole
+	Role   UserRole
+	Search string
 }

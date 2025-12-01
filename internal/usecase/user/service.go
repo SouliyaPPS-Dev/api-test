@@ -28,7 +28,8 @@ func NewService(repo domain.UserRepository) *Service {
 
 // Filter captures supported filters for listing users.
 type Filter struct {
-	Role string
+	Role   string
+	Search string
 }
 
 // CreateInput defines the payload to create a new user.
@@ -56,6 +57,7 @@ func (s *Service) List(ctx context.Context, filter Filter) ([]*domain.User, erro
 		}
 		domainFilter.Role = role
 	}
+	domainFilter.Search = strings.TrimSpace(filter.Search)
 
 	users, err := s.repo.List(ctx, domainFilter)
 	if err != nil {

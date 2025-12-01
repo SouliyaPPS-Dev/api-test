@@ -337,7 +337,8 @@ func (s *Server) handleAdminUsers(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		filter := userusecase.Filter{
-			Role: r.URL.Query().Get("role"),
+			Role:   r.URL.Query().Get("role"),
+			Search: r.URL.Query().Get("search"),
 		}
 		users, err := s.userService.List(r.Context(), filter)
 		if err != nil {

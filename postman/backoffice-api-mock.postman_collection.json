@@ -920,7 +920,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/admin/users",
+              "raw": "{{baseUrl}}/admin/users?search=john&role=admin",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -930,8 +930,14 @@
               ],
               "query": [
                 {
+                  "key": "search",
+                  "value": "john",
+                  "disabled": false
+                },
+                {
                   "key": "role",
-                  "value": "admin"
+                  "value": "admin",
+                  "disabled": false
                 }
               ]
             }
@@ -948,7 +954,7 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{baseUrl}}/admin/users",
+                  "raw": "{{baseUrl}}/admin/users?search=john&role=admin",
                   "host": [
                     "{{baseUrl}}"
                   ],
@@ -958,8 +964,14 @@
                   ],
                   "query": [
                     {
+                      "key": "search",
+                      "value": "john",
+                      "disabled": false
+                    },
+                    {
                       "key": "role",
-                      "value": "admin"
+                      "value": "admin",
+                      "disabled": false
                     }
                   ]
                 }

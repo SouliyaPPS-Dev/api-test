@@ -3,6 +3,8 @@ package postgres
 import (
 	"context"
 	"errors"
+	"strconv"
+	"strings"
 	"time"
 
 	domain "backoffice/backend/internal/domain/auth"
@@ -86,10 +88,23 @@ SELECT id, email, name, role, password_hash, created_at, updated_at
 FROM users
 `
 	var args []any
+	var conditions []string
+
 	if filter.Role != "" {
-		query += "WHERE role = $1 "
+		conditions = append(conditions, "role = $"+strconv.Itoa(len(args)+1))
 		args = append(args, filter.Role)
 	}
+
+	if filter.Search != "" {
+		argNum := len(args) + 1
+		conditions = append(conditions, "(email ILIKE $"+strconv.Itoa(argNum)+" OR name ILIKE $"+strconv.Itoa(argNum)+")")
+		args = append(args, "%"+filter.Search+"%")
+	}
+
+	if len(conditions) > 0 {
+		query += "WHERE " + strings.Join(conditions, " AND ") + " "
+	}
+
 	query += "ORDER BY created_at DESC"
 
 	rows, err := r.pool.Query(ctx, query, args...)
