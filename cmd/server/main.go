@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"os"
 	"os/signal"
 	"syscall"
 	"time"
@@ -24,14 +25,24 @@ func main() {
 		log.Fatalf("failed to load config: %v", err)
 	}
 
+	if len(os.Args) > 1 && os.Args[1] == "migrate" {
+		cfg.RunMigrations = true
+	}
+
 	rootCtx := context.Background()
 	db, err := postgres.New(rootCtx, cfg.DatabaseURL)
 	if err != nil {
 		log.Fatalf("failed to connect to database: %v", err)
 	}
 	defer db.Close()
-	if err := db.Migrate(rootCtx); err != nil {
-		log.Fatalf("failed to run database migrations: %v", err)
+	if cfg.RunMigrations {
+		if err := db.Migrate(rootCtx); err != nil {
+			log.Fatalf("failed to run database migrations: %v", err)
+		}
+		log.Println("database migrations completed successfully")
+		if len(os.Args) > 1 && os.Args[1] == "migrate" {
+			os.Exit(0)
+		}
 	}
 
 	tokenManager := token.NewJWTManager(cfg.JWTSecret, cfg.JWTExpiry, cfg.JWTIssuer)

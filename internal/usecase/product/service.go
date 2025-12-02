@@ -33,6 +33,7 @@ type CreateInput struct {
 	SKU         string  `json:"sku"`
 	Price       float64 `json:"price"`
 	Quantity    int     `json:"quantity"`
+	ImageURL    *string `json:"imageUrl"`
 }
 
 // UpdateInput encapsulates partial product updates.
@@ -42,6 +43,7 @@ type UpdateInput struct {
 	SKU         *string  `json:"sku"`
 	Price       *float64 `json:"price"`
 	Quantity    *int     `json:"quantity"`
+	ImageURL    *string  `json:"imageUrl"`
 }
 
 // Create stores a new product after validation.
@@ -69,6 +71,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (*domain.Produc
 		SKU:         input.SKU,
 		Price:       input.Price,
 		Quantity:    input.Quantity,
+		ImageURL:    input.ImageURL,
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
@@ -120,7 +123,7 @@ func (s *Service) Update(ctx context.Context, id string, input UpdateInput) (*do
 		*input.SKU = newSKU
 	}
 
-	product.Update(input.Name, input.Description, input.SKU, input.Price, input.Quantity)
+	product.Update(input.Name, input.Description, input.SKU, input.Price, input.Quantity, input.ImageURL)
 
 	if err := s.repo.Update(ctx, product); err != nil {
 		return nil, err

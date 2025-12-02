@@ -15,6 +15,7 @@ import (
 type Config struct {
 	HTTPPort        string
 	DatabaseURL     string
+	RunMigrations   bool
 	JWTSecret       string
 	JWTIssuer       string
 	JWTExpiry       time.Duration
@@ -38,6 +39,7 @@ func Load() (Config, error) {
 	cfg := Config{
 		HTTPPort:        httpPort,
 		DatabaseURL:     resolveDatabaseURL(),
+		RunMigrations:   getBoolEnv("RUN_MIGRATIONS", true),
 		JWTSecret:       getEnv("JWT_SECRET", ""),
 		JWTIssuer:       getEnv("JWT_ISSUER", "backoffice"),
 		JWTExpiry:       getDurationEnv("JWT_EXPIRY", 12*time.Hour),
@@ -76,6 +78,15 @@ func getIntEnv(key string, fallback int) int {
 	if val, ok := os.LookupEnv(key); ok && val != "" {
 		if n, err := strconv.Atoi(val); err == nil {
 			return n
+		}
+	}
+	return fallback
+}
+
+func getBoolEnv(key string, fallback bool) bool {
+	if val, ok := os.LookupEnv(key); ok && val != "" {
+		if b, err := strconv.ParseBool(val); err == nil {
+			return b
 		}
 	}
 	return fallback

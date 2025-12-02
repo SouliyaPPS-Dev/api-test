@@ -20,12 +20,13 @@ type Product struct {
 	SKU         string    `json:"sku"`
 	Price       float64   `json:"price"`
 	Quantity    int       `json:"quantity"`
+	ImageURL    *string   `json:"imageUrl"`
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
 // Update applies arbitrary field updates to the product.
-func (p *Product) Update(name, description, sku *string, price *float64, quantity *int) {
+func (p *Product) Update(name, description, sku *string, price *float64, quantity *int, imageURL *string) {
 	if name != nil {
 		p.Name = *name
 	}
@@ -40,6 +41,9 @@ func (p *Product) Update(name, description, sku *string, price *float64, quantit
 	}
 	if quantity != nil {
 		p.Quantity = *quantity
+	}
+	if imageURL != nil {
+		p.ImageURL = imageURL
 	}
 	p.UpdatedAt = time.Now().UTC()
 }

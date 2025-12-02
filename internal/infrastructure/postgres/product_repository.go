@@ -23,8 +23,8 @@ func NewProductRepository(pool *pgxpool.Pool) *ProductRepository {
 // Create inserts a new product.
 func (r *ProductRepository) Create(ctx context.Context, product *domain.Product) error {
 	const query = `
-INSERT INTO products (id, name, description, sku, price, quantity, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO products (id, name, description, sku, price, quantity, image_url, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 `
 	_, err := r.pool.Exec(ctx, query,
 		product.ID,
@@ -33,6 +33,7 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		product.SKU,
 		product.Price,
 		product.Quantity,
+		product.ImageURL,
 		product.CreatedAt,
 		product.UpdatedAt,
 	)
@@ -48,7 +49,7 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 // GetByID fetches a product by id.
 func (r *ProductRepository) GetByID(ctx context.Context, id string) (*domain.Product, error) {
 	const query = `
-SELECT id, name, description, sku, price, quantity, created_at, updated_at
+SELECT id, name, description, sku, price, quantity, image_url, created_at, updated_at
 FROM products WHERE id = $1
 `
 	row := r.pool.QueryRow(ctx, query, id)
@@ -65,7 +66,7 @@ FROM products WHERE id = $1
 // GetBySKU fetches a product using its SKU.
 func (r *ProductRepository) GetBySKU(ctx context.Context, sku string) (*domain.Product, error) {
 	const query = `
-SELECT id, name, description, sku, price, quantity, created_at, updated_at
+SELECT id, name, description, sku, price, quantity, image_url, created_at, updated_at
 FROM products WHERE sku = $1
 `
 	row := r.pool.QueryRow(ctx, query, sku)
@@ -82,7 +83,7 @@ FROM products WHERE sku = $1
 // List returns all products sorted by name.
 func (r *ProductRepository) List(ctx context.Context) ([]*domain.Product, error) {
 	const query = `
-SELECT id, name, description, sku, price, quantity, created_at, updated_at
+SELECT id, name, description, sku, price, quantity, image_url, created_at, updated_at
 FROM products
 ORDER BY name ASC
 `
@@ -112,7 +113,8 @@ SET name = $2,
     sku = $4,
     price = $5,
     quantity = $6,
-    updated_at = $7
+    image_url = $7,
+    updated_at = $8
 WHERE id = $1
 `
 	tag, err := r.pool.Exec(ctx, query,
@@ -122,6 +124,7 @@ WHERE id = $1
 		product.SKU,
 		product.Price,
 		product.Quantity,
+		product.ImageURL,
 		product.UpdatedAt,
 	)
 	if err != nil {
@@ -158,6 +161,7 @@ func scanProduct(row pgx.Row) (*domain.Product, error) {
 		&p.SKU,
 		&p.Price,
 		&p.Quantity,
+		&p.ImageURL,
 		&p.CreatedAt,
 		&p.UpdatedAt,
 	)
