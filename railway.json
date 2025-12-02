@@ -4,7 +4,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "./server",
-    "releaseCommand": "./server migrate"
+    "releaseCommand": "go build -o /bin/migrate ./cmd/migrate && /bin/migrate",
+    "startCommand": "go build -o /bin/server ./cmd/server && /bin/server"
   }
 }
