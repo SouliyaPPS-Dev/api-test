@@ -13,10 +13,14 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux \
     go build -trimpath -buildvcs=false -o /bin/server ./cmd/server
 
+RUN CGO_ENABLED=0 GOOS=linux \
+    go build -trimpath -buildvcs=false -o /bin/migrate ./cmd/migrate
+
 FROM gcr.io/distroless/static-debian12:nonroot
 
 WORKDIR /app
 COPY --from=builder /bin/server /app/server
+COPY --from=builder /bin/migrate /app/migrate
 
 EXPOSE 8080
 
