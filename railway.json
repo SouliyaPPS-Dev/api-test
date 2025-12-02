@@ -4,7 +4,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "./main",
-    "releaseCommand": "./main migrate"
+    "startCommand": "./server",
+    "releaseCommand": "./server migrate"
   }
 }
