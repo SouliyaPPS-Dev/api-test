@@ -1,10 +1,11 @@
 {
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
-    "builder": "NIXPACKS"
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "Dockerfile"
   },
   "deploy": {
-    "releaseCommand": "go build -o /bin/migrate ./cmd/migrate && /bin/migrate",
-    "startCommand": "go build -o /bin/server ./cmd/server && /bin/server"
+    "releaseCommand": "/app/migrate",
+    "startCommand": "/app/server"
   }
 }
